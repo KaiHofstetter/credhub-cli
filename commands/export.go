@@ -6,6 +6,7 @@ import (
 
 	"code.cloudfoundry.org/credhub-cli/config"
 	"code.cloudfoundry.org/credhub-cli/credhub/credentials"
+	"code.cloudfoundry.org/credhub-cli/credhub/credentials/values"
 	"code.cloudfoundry.org/credhub-cli/models"
 )
 
@@ -50,6 +51,12 @@ func getAllCredentialsForPath(path string) ([]credentials.Credential, error) {
 		return nil, err
 	}
 
+	allCertsMetadata, err := credhubClient.GetAllCertificatesMetadata()
+
+	if err != nil {
+		return nil, err
+	}
+
 	credentials := make([]credentials.Credential, len(allPaths.Credentials))
 	for i, baseCred := range allPaths.Credentials {
 		credential, err := credhubClient.GetLatestVersion(baseCred.Name)
@@ -58,8 +65,30 @@ func getAllCredentialsForPath(path string) ([]credentials.Credential, error) {
 			return nil, err
 		}
 
+		var value interface{}
+
+		if cert, ok := credential.Value.(values.Certificate); ok {
+			if caName, caNameOk := extractCaName(credential.Name, allCertsMetadata); caNameOk {
+				cert.CaName = caName
+				value = cert
+			}
+		} else {
+			value = credential.Value
+		}
+		credential.Value = value
 		credentials[i] = credential
 	}
 
 	return credentials, nil
+}
+
+func extractCaName(certName string, certificates []credentials.CertificateMetadata) (string, bool) {
+	for _, certMetadata := range certificates {
+		for _, sign := range certMetadata.Signs {
+			if sign == certName {
+				return certMetadata.Name, true
+			}
+		}
+	}
+	return "", false
 }

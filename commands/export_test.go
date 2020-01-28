@@ -46,6 +46,12 @@ var _ = Describe("Export", func() {
 			responseStatus:      http.StatusOK,
 			endpoint:            "/api/v1/data",
 		},
+		{
+			method:              "GET",
+			responseFixtureFile: "get_certs_response.json",
+			responseStatus:      http.StatusOK,
+			endpoint:            "/api/v1/certificates/",
+		},
 	}
 	ItAutomaticallyLogsIn(testAutoLogIns, "export")
 
@@ -83,6 +89,38 @@ var _ = Describe("Export", func() {
 				}]
 			}`
 
+			certificates := `{
+				"certificates": [{
+					"id": "cert-id",
+					"name": "/cert",
+					"signed_by": "/cert_ca",
+					"signs": [],
+					"versions": [{
+							"certificate_authority": false,
+							"expiry_date": "2020-11-28T14:04:40Z",
+							"generated": true,
+							"id": "cert-version-id",
+							"self_signed": false,
+							"transitional": false
+						}
+					]}, {
+					"id": "cert-ca-id",
+					"name": "/cert_ca",
+					"signed_by": "/cert_ca",
+					"signs": [
+						"/cert"
+					],
+					"versions": [{
+							"certificate_authority": true,
+							"expiry_date": "2020-11-28T14:04:38Z",
+							"generated": true,
+							"id": "cert-ca-version-id",
+							"self_signed": true,
+							"transitional": false
+						}
+					]}
+				]}`
+
 			responseTable := `credentials:
 - name: /path/to/cred
   type: value
@@ -95,6 +133,10 @@ var _ = Describe("Export", func() {
 				CombineHandlers(
 					VerifyRequest("GET", "/api/v1/data", "path="),
 					RespondWith(http.StatusOK, findJson),
+				),
+				CombineHandlers(
+					VerifyRequest("GET", "/api/v1/certificates/"),
+					RespondWith(http.StatusOK, certificates),
 				),
 				CombineHandlers(
 					VerifyRequest("GET", "/api/v1/data", "name=/path/to/cred&current=true"),
@@ -115,11 +157,16 @@ var _ = Describe("Export", func() {
 		Context("when given a path", func() {
 			It("queries for credentials matching that path", func() {
 				noCredsJson := `{ "credentials" : [] }`
+				noCertificates := `{ "certificates" : [] }`
 
 				server.AppendHandlers(
 					CombineHandlers(
 						VerifyRequest("GET", "/api/v1/data", "path=some/path"),
 						RespondWith(http.StatusOK, noCredsJson),
+					),
+					CombineHandlers(
+						VerifyRequest("GET", "/api/v1/certificates/"),
+						RespondWith(http.StatusOK, noCertificates),
 					),
 				)
 
@@ -133,6 +180,7 @@ var _ = Describe("Export", func() {
 			It("writes the YAML to that file", func() {
 				withTemporaryFile(func(filename string) {
 					noCredsJson := `{ "credentials" : [] }`
+					noCertificates := `{ "certificates" : [] }`
 					noCredsYaml := `credentials: []
 `
 
@@ -140,6 +188,10 @@ var _ = Describe("Export", func() {
 						CombineHandlers(
 							VerifyRequest("GET", "/api/v1/data", "path="),
 							RespondWith(http.StatusOK, noCredsJson),
+						),
+						CombineHandlers(
+							VerifyRequest("GET", "/api/v1/certificates/"),
+							RespondWith(http.StatusOK, noCertificates),
 						),
 					)
 
@@ -171,11 +223,16 @@ var _ = Describe("Export", func() {
 
 		It("prints an error if the specified output file cannot be opened", func() {
 			noCredsJson := `{ "credentials" : [] }`
+			noCertificates := `{ "certificates" : [] }`
 
 			server.AppendHandlers(
 				CombineHandlers(
 					VerifyRequest("GET", "/api/v1/data", "path="),
 					RespondWith(http.StatusOK, noCredsJson),
+				),
+				CombineHandlers(
+					VerifyRequest("GET", "/api/v1/certificates/"),
+					RespondWith(http.StatusOK, noCertificates),
 				),
 			)
 
